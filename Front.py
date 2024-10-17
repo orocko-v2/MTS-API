@@ -1,3 +1,4 @@
+import configparser
 import datetime
 import json
 import os.path
@@ -23,29 +24,30 @@ from PyQt6.QtWidgets import (
     QDialog,
     QSystemTrayIcon,
     QMenu,
-
-
+    QTextEdit
 )
+
 from requests import HTTPError
 
 import Authentication
 import ReportCreator
 import Requests
+import config_path_file
+from Exceptions import WrongPasswordException
 
 global mainWindow
 global loginStatus
 
 
 class LoginWindow(QDialog):
-
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Login")
+        self.setWindowTitle("Вход в систему")
         layout = QVBoxLayout()
 
-        self.loginLineEdit = QLineEdit("Login")
-        self.passwordLineEdit = QLineEdit("Password")
-        self.rememberCheckbox = QCheckBox("Remember me?")
+        self.loginLineEdit = QLineEdit("Логин")
+        self.passwordLineEdit = QLineEdit("Пароль")
+        self.rememberCheckbox = QCheckBox("Запомнить?")
         self.rememberCheckbox.setCheckState(Qt.CheckState.Unchecked)
         data = self.fillData()
         self.loginLineEdit.setText(data[0])
@@ -53,12 +55,11 @@ class LoginWindow(QDialog):
 
         self.passwordLineEdit.setEchoMode(QLineEdit.EchoMode.Password)
 
-        button = QPushButton("Login")
-        button.clicked.connect(self.login)
+        button = QPushButton("Войти в аккаунт")
+        button.clicked.connect(self.loginUser)
 
-        registerButton = QPushButton('Register')
+        registerButton = QPushButton('Зарегистрировать')
         registerButton.clicked.connect(self.createRegisterWindow)
-
 
         layout.addWidget(self.loginLineEdit)
         layout.addWidget(self.passwordLineEdit)
@@ -73,35 +74,31 @@ class LoginWindow(QDialog):
         registerWindow = RegisterWindow()
         registerWindow.show()
 
-
     def fillData(self):
-        file = open("data/auth-params.json")
-        auth_params = json.load(file)
-        login = auth_params.get('login')
-        password = auth_params.get('password')
-        return [login, password]
-
-    # def closeEvent(self, event):
-    #     print('close2')
-    #     for window in QApplication.topLevelWidgets():
-    #         window.close()
+        config = readConfig()
+        return [config['login']['login'], config['login']['password']]
 
     def login(self):
-
         if (Authentication.LoginUser(self.loginLineEdit.text(), self.passwordLineEdit.text())) is not None:
-            loginStatus = True
-        # if error code is not valid then dont write
-        if (self.rememberCheckbox.checkState() == Qt.CheckState.Checked):
-            print('asaasaa')
-            file = open("data/auth-params.json", "w")
-            data = {'login': self.loginLineEdit.text(), 'password': self.passwordLineEdit.text()}
-            obj = json.dumps(data, indent=2)
-            file.write(obj)
-            file.close()
-        self.setEnabled(False)
-        self.close()
-        print('main')
-        mainWindow.show()
+            if (self.rememberCheckbox.checkState() == Qt.CheckState.Checked):
+                config = readConfig()
+                config['login']['login'] = self.loginLineEdit.text()
+                config['login']['password'] = self.passwordLineEdit.text()
+                with open(config_path_file.CONFIG_PATH, 'w') as configfile:
+                    config.write(configfile)
+            self.setEnabled(False)
+            self.close()
+            mainWindow.show()
+        else:
+            raise WrongPasswordException()
+
+    def loginUser(self):
+        try:
+            self.login()
+        except WrongPasswordException as e:
+            errorBox = QtWidgets.QMessageBox()
+            errorBox.setText("Неправильный логин или пароль")
+            errorBox.exec()
 
 
 class MainWindow(QMainWindow):
@@ -111,7 +108,8 @@ class MainWindow(QMainWindow):
         self.time = "00:00"
         self.ui = uic.loadUi('data/mainwindow.ui', self)
         self.ui.selectFileButton.clicked.connect(self.buttonClick)
-        self.ui.createReportButton.clicked.connect(lambda: ReportCreator.createDailyReport(self.file, float(self.ui.plainTextEdit.toPlainText())))
+        self.ui.createReportButton.clicked.connect(
+            lambda: ReportCreator.createDailyReport(self.file, float(self.ui.plainTextEdit.toPlainText())))
         self.ui.startThreadButton.clicked.connect(self.threadingStart)
         self.ui.stopThreadButton.clicked.connect(self.stopEvent)
 
@@ -123,6 +121,11 @@ class MainWindow(QMainWindow):
         exit.triggered.connect(self.exitEvent)
         self.trayIcon.setContextMenu(menu)
         self.ui.reportDoneLine.setVisible(False)
+        self.ui.settingsButton.clicked.connect(self.openSettings)
+
+    def openSettings(self):
+        settingsWindow = SettingsWindow(self)
+        settingsWindow.show()
 
     def stopEvent(self):
         self.stop_event.set()
@@ -147,7 +150,8 @@ class MainWindow(QMainWindow):
             print(self.file, datetime.datetime.now(), reportTime)
             if len(schedule.get_jobs()) != 1:
                 schedule.clear()
-                schedule.every().day.at(reportTime).do(ReportCreator.createDailyReport, (self.file, float(self.ui.plainTextEdit.toPlainText())))
+                schedule.every().day.at(reportTime).do(ReportCreator.createDailyReport,
+                                                       (self.file, float(self.ui.plainTextEdit.toPlainText())))
             elif schedule.get_jobs()[0].next_run.time().strftime('%H:%M') != reportTime:
                 schedule.clear()
                 schedule.every().day.at(reportTime).do(ReportCreator.createDailyReport, self.file)
@@ -155,32 +159,32 @@ class MainWindow(QMainWindow):
             schedule.run_pending()
             print(ReportCreator.reportDone)
             if ReportCreator.reportDone:
-                self.ui.reportDoneLine.setText("Report created " + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                self.ui.reportDoneLine.setText("Отчет создан " + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                 self.ui.reportDoneLine.setVisible(True)
                 ReportCreator.reportDone = False
             time.sleep(60)
 
     def threadingStart(self):
         self.stop_event = threading.Event()
-        self.c_thread = threading.Thread(target=self.createDalyReportSchedule, args=(self.stop_event, ))
+        self.c_thread = threading.Thread(target=self.createDalyReportSchedule, args=(self.stop_event,))
         self.c_thread.start()
-
 
     def buttonClick(self):
         filter = "xls(*.xls *.xlsx)"
-        self.file = QFileDialog.getOpenFileName(self, 'Select file', filter=filter)[0]
+        self.file = QFileDialog.getOpenFileName(self, 'Выбрать файл', filter=filter)[0]
         self.ui.filenameTextLine.setText(os.path.basename(self.file))
         print(self.file)
+
 
 class RegisterWindow(QDialog):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle('Register user')
+        self.setWindowTitle('Регистрация пользователя')
         layout = QVBoxLayout()
         self.loginLineEdit = QLineEdit()
         self.passwordLineEdit = QLineEdit()
 
-        button = QPushButton("Register")
+        button = QPushButton("Зарегистрировать")
         button.clicked.connect(lambda: self.register(self.loginLineEdit.text(), self.passwordLineEdit.text()))
 
         layout.addWidget(self.loginLineEdit)
@@ -196,8 +200,73 @@ class RegisterWindow(QDialog):
             self.close()
         except HTTPError as e:
             errorBox = QtWidgets.QMessageBox()
-            errorBox.setText("WRONG LOGIN OR PASSWORD")
+            errorBox.setText("Неправильный логин или пароль")
             errorBox.exec()
+
+
+class SettingsWindow(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle('Настройки')
+        layout = QVBoxLayout()
+
+        self.databaseNameTextEdit = QTextEdit('Название БД')
+        self.databaseNameTextEdit.setReadOnly(True)
+        self.databaseNameTextEdit.setFixedHeight(self.databaseNameTextEdit.document().lineCount() * 30)
+        self.databaseNameLineEdit = QLineEdit()
+
+        self.userNameTextEdit = QTextEdit("Имя пользователя")
+        self.userNameTextEdit.setReadOnly(True)
+        self.userNameTextEdit.setFixedHeight(self.userNameTextEdit.document().lineCount() * 30)
+        self.userNameLineEdit = QLineEdit()
+
+        self.passwordTextEdit = QTextEdit("Пароль")
+        self.passwordTextEdit.setReadOnly(True)
+        self.passwordTextEdit.setFixedHeight(self.passwordTextEdit.document().lineCount() * 30)
+        self.passwordLineEdit = QLineEdit()
+
+        self.hostTextEdit = QTextEdit("Хост")
+        self.hostTextEdit.setReadOnly(True)
+        self.hostTextEdit.setFixedHeight(self.hostTextEdit.document().lineCount() * 30)
+        self.hostLineEdit = QLineEdit()
+
+        layout.addWidget(self.databaseNameTextEdit)
+        layout.addWidget(self.databaseNameLineEdit)
+        layout.addWidget(self.userNameTextEdit)
+        layout.addWidget(self.userNameLineEdit)
+        layout.addWidget(self.passwordTextEdit)
+        layout.addWidget(self.passwordLineEdit)
+        layout.addWidget(self.hostTextEdit)
+        layout.addWidget(self.hostLineEdit)
+
+        self.setLayout(layout)
+
+    def closeEvent(self, event):
+        print(self.databaseNameLineEdit.text())
+        self.writeConfig()
+        self.close()
+
+    def writeConfig(self):
+        config = readConfig()
+        if self.databaseNameLineEdit.text() != '':
+            config['database']['dbname'] = self.databaseNameLineEdit.text()
+        if self.userNameLineEdit.text() != '':
+            config['database']['user'] = self.userNameLineEdit.text()
+        if self.passwordLineEdit.text() != '':
+            config['database']['password'] = self.passwordLineEdit.text()
+        if self.hostLineEdit.text() != '':
+            config['database']['host'] = self.hostLineEdit.text()
+
+        with open(config_path_file.CONFIG_PATH, 'w') as configfile:
+            config.write(configfile)
+
+
+def readConfig():
+    config = configparser.ConfigParser()
+    path = config_path_file.CONFIG_PATH
+    config.read(path)
+    return config
+
 
 app = QApplication(sys.argv)
 app.setQuitOnLastWindowClosed(False)
@@ -205,4 +274,3 @@ mainWindow = MainWindow()
 loginWindow = LoginWindow()
 loginWindow.show()
 sys.exit(app.exec())
-

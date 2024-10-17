@@ -8,21 +8,24 @@ def generateHash(password_str):
     :param password_str: User password in string format
     :return:
     """
-    salt = bcrypt.gensalt()
-    password_hash = bcrypt.hashpw(
-        password=password_str.encode("utf-8"),
-        salt=salt
-    )
-    return password_hash
+    return bcrypt.hashpw(password_str.encode('utf-8'), bcrypt.gensalt())
 
-def checkHash(userpassword_str, hash):
+def checkHash(userpassword, hash):
     """
     Check if inputted password and stored hash are similar
-    :param userpassword_str: inputted password
+    :param userpassword: inputted password
     :param hash: stored hash
     :return: True of False
     """
-    return bcrypt.checkpw(password=userpassword_str.encode('utf-8'), hashed_password=hash)
+    try:
+        return bcrypt.checkpw(password=userpassword.encode('utf-8'), hashed_password=hash)
+    except Exception as e:
+        print(e.args[0])
+        try:
+            return bcrypt.checkpw(password=userpassword, hashed_password=hash)
+        except Exception as e:
+            print(e.args[0])
+            return False
 
 def RegisterNewUser(login, password):
     """

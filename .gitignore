@@ -249,3 +249,4 @@ data/backup2.sql
 data/auth-params.json
 data/config.ini
 test.py
+*.zip
