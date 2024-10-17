@@ -2,6 +2,9 @@ import psycopg2, config_path_file, configparser
 from psycopg2.errorcodes import UNIQUE_VIOLATION
 from psycopg2 import errors
 
+from Exceptions import DatabaseConnectionException
+
+
 def connectToDatabase():
     """
     Connect to a database
@@ -17,7 +20,7 @@ def connectToDatabase():
         conn = psycopg2.connect(dbname=dbname, user=user, password=password, host=host)
         return conn
     except:
-        print('ne poluchilos') #raise an error
+        raise DatabaseConnectionException
 
 
 #rename to addLogPass or let add all data

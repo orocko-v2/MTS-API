@@ -17,8 +17,17 @@ class UserRegisterException(Exception):
         super().__init__(self.message)
 
 class WrongPasswordException(Exception):
-    def __init__(self, message="Неправильный логин или пароль"):
+    def __init__(self, message="Неправильный пароль"):
         self.message = message
         super().__init__(self.message)
 
+class WrongLoginException(Exception):
+    def __init__(self, message="Неправильный логин"):
+        self.message = message
+        super().__init__(self.message)
+
+class DatabaseConnectionException(Exception):
+    def __init__(self, message="Нет доступа к базе данных"):
+        self.message = message
+        super().__init__(self.message)
 

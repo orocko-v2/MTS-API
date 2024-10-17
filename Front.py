@@ -1,25 +1,19 @@
 import configparser
 import datetime
-import json
 import os.path
 import sys
 import threading
 import time
 
 import schedule
-from PyQt6.QtGui import QIcon, QAction
+from PyQt6.QtGui import QIcon
 from PyQt6 import QtWidgets, uic
-from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtWidgets import (
     QApplication,
-    QWidget,
     QMainWindow,
     QPushButton,
-    QLabel,
-    QCheckBox,
     QVBoxLayout,
     QLineEdit,
-    QGridLayout,
     QFileDialog,
     QDialog,
     QSystemTrayIcon,
@@ -31,9 +25,8 @@ from requests import HTTPError
 
 import Authentication
 import ReportCreator
-import Requests
 import config_path_file
-from Exceptions import WrongPasswordException
+from Exceptions import WrongPasswordException, WrongLoginException, DatabaseConnectionException
 
 global mainWindow
 global loginStatus
@@ -45,47 +38,38 @@ class LoginWindow(QDialog):
         self.setWindowTitle("Вход в систему")
         layout = QVBoxLayout()
 
-        self.loginLineEdit = QLineEdit("Логин")
-        self.passwordLineEdit = QLineEdit("Пароль")
-        self.rememberCheckbox = QCheckBox("Запомнить?")
-        self.rememberCheckbox.setCheckState(Qt.CheckState.Unchecked)
-        data = self.fillData()
-        self.loginLineEdit.setText(data[0])
-        self.passwordLineEdit.setText(data[1])
-
+        self.loginLineEdit = QLineEdit()
+        self.passwordLineEdit = QLineEdit()
         self.passwordLineEdit.setEchoMode(QLineEdit.EchoMode.Password)
 
         button = QPushButton("Войти в аккаунт")
         button.clicked.connect(self.loginUser)
+
+        settingsButton = QPushButton('Настройки')
+        settingsButton.clicked.connect(self.openSettings)
 
         registerButton = QPushButton('Зарегистрировать')
         registerButton.clicked.connect(self.createRegisterWindow)
 
         layout.addWidget(self.loginLineEdit)
         layout.addWidget(self.passwordLineEdit)
-        layout.addWidget(self.rememberCheckbox)
         layout.addWidget(button)
         layout.addWidget(registerButton)
+        layout.addWidget(settingsButton)
 
         self.setLayout(layout)
         self.setMinimumSize(300, 150)
+
+    def openSettings(self):
+        settingsWindow = SettingsWindow(self)
+        settingsWindow.show()
 
     def createRegisterWindow(self):
         registerWindow = RegisterWindow()
         registerWindow.show()
 
-    def fillData(self):
-        config = readConfig()
-        return [config['login']['login'], config['login']['password']]
-
     def login(self):
         if (Authentication.LoginUser(self.loginLineEdit.text(), self.passwordLineEdit.text())) is not None:
-            if (self.rememberCheckbox.checkState() == Qt.CheckState.Checked):
-                config = readConfig()
-                config['login']['login'] = self.loginLineEdit.text()
-                config['login']['password'] = self.passwordLineEdit.text()
-                with open(config_path_file.CONFIG_PATH, 'w') as configfile:
-                    config.write(configfile)
             self.setEnabled(False)
             self.close()
             mainWindow.show()
@@ -95,9 +79,17 @@ class LoginWindow(QDialog):
     def loginUser(self):
         try:
             self.login()
-        except WrongPasswordException as e:
+        except WrongPasswordException as ePass:
             errorBox = QtWidgets.QMessageBox()
-            errorBox.setText("Неправильный логин или пароль")
+            errorBox.setText("Неправильный пароль")
+            errorBox.exec()
+        except WrongLoginException as eLogin:
+            errorBox = QtWidgets.QMessageBox()
+            errorBox.setText("Неверный логин")
+            errorBox.exec()
+        except DatabaseConnectionException as eConn:
+            errorBox = QtWidgets.QMessageBox()
+            errorBox.setText("Нет доступа к базе данных")
             errorBox.exec()
 
 
@@ -241,6 +233,8 @@ class SettingsWindow(QDialog):
 
         self.setLayout(layout)
 
+        self.fillData()
+
     def closeEvent(self, event):
         print(self.databaseNameLineEdit.text())
         self.writeConfig()
@@ -259,6 +253,13 @@ class SettingsWindow(QDialog):
 
         with open(config_path_file.CONFIG_PATH, 'w') as configfile:
             config.write(configfile)
+
+    def fillData(self):
+        config = readConfig()
+        self.databaseNameLineEdit.setText(config['database']['dbname'])
+        self.userNameLineEdit.setText(config['database']['user'])
+        self.passwordLineEdit.setText(config['database']['password'])
+        self.hostLineEdit.setText(config['database']['host'])
 
 
 def readConfig():

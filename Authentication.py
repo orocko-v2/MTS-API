@@ -1,5 +1,6 @@
 import bcrypt, configparser, DatabaseConnector, Requests, config_path_file
-from Exceptions import UserRegisterException
+from Exceptions import UserRegisterException, WrongLoginException
+
 
 @staticmethod
 def generateHash(password_str):
@@ -47,9 +48,12 @@ def LoginUser(login, password):
     """
     conn = DatabaseConnector.connectToDatabase()
     with conn.cursor() as cursor:
-        query = "SELECT user_password_hash from mtsapi.users where user_login = %s"
-        cursor.execute(query, [login])
-        db_password = cursor.fetchone()[0]
+        try:
+            query = "SELECT user_password_hash from mtsapi.users where user_login = %s"
+            cursor.execute(query, [login])
+            db_password = cursor.fetchone()[0]
+        except TypeError as e:
+            raise WrongLoginException()
     if checkHash(password, db_password.encode('utf-8')):
         print("Success")
         global _login
