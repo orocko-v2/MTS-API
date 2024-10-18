@@ -113,7 +113,6 @@ class MainWindow(QMainWindow):
         exit.triggered.connect(self.exitEvent)
         self.trayIcon.setContextMenu(menu)
         self.ui.reportDoneLine.setVisible(False)
-        self.ui.settingsButton.clicked.connect(self.openSettings)
 
     def openSettings(self):
         settingsWindow = SettingsWindow(self)

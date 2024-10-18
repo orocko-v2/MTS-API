@@ -2,7 +2,8 @@ import datetime
 import os, re, pandas as pd
 import time
 import requests.exceptions
-
+import openpyxl
+from openpyxl.utils.dataframe import dataframe_to_rows
 import Authentication
 import Requests
 import config_path_file
@@ -80,7 +81,7 @@ def createDailyReport(file, nds, report_date=None):
                     print('sleep')
                     time.sleep(10)
                     continue
-                elif (int(e.args[0][0:3]) == 401) and i < 3:
+                elif (int(e.args[0][0:3]) == 401) and i < 2:
                     Authentication.LoginUser(Authentication._login, Authentication._password)
                     time.sleep(60)
                     i+=1
@@ -90,18 +91,70 @@ def createDailyReport(file, nds, report_date=None):
                     successful = True
                     continue
     path = uniquify('reports/otchet/report_' + report_date.date().strftime("%d_%m_%y") + '.xlsx')
-    new_df = pd.DataFrame(list, columns = ['Абонентский номер', 'ФИО', 'Комментарий', 'Расходы за день с НДС', 'Расходы за день без НДС','Расходы с начала месяца с НДС',  "Расходы с начала месяца без НДС",  'Превышение лимита'])
+    new_df = pd.DataFrame(list, columns = ['Абонентский номер', 'ФИО', 'Комментарий', 'с НДС', 'без НДС','с НДС',  "без НДС",  'Превышение лимита'])
+    print(new_df)
     if not new_df.empty:
-        writer = pd.ExcelWriter(path)
-        print(new_df.dtypes)
-        print(new_df)
-        new_df.to_excel(writer,sheet_name='Sheet1', index=False)
-        for column in new_df:
-            print(column)
-            column_width = max(new_df[column].astype(str).map(len).max() + 1, len(column) + 1)
-            col_idx = new_df.columns.get_loc(column)
-            writer.sheets['Sheet1'].set_column(col_idx, col_idx, column_width)
-        writer.close()
+        print('not empty')
+        wb = openpyxl.Workbook()
+        ws = wb.active
+
+        for row in dataframe_to_rows(new_df, index=False, header=True):
+            ws.append(row)
+
+        month = ''
+        match report_date.month:
+            case 1:
+                month = "Январь"
+            case 2:
+                month = "Февраль"
+            case 3:
+                month = "Март"
+            case 4:
+                month = "Апрель"
+            case 5:
+                month = "Май"
+            case 6:
+                month = "Июнь"
+            case 7:
+                month = "Июль"
+            case 8:
+                month = "Август"
+            case 9:
+                month = "Сентябрь"
+            case 10:
+                month = "Октябрь"
+            case 11:
+                month = "Ноябрь"
+            case 12:
+                month = "Декабрь"
+
+        print(month)
+
+        ws.insert_rows(1, amount=2)
+        ws.merge_cells('D1:G1')
+        ws.cell(1, 4).value = f'Расходы, {month}'
+        ws.merge_cells('D2:E2')
+        ws.cell(2, 4).value = 'За день'
+        ws.merge_cells('F2:G2')
+        ws.cell(2, 6).value = 'С начала месяца'
+
+
+        i = 0
+        for column in ws.columns:
+            i+=1
+            max_length = 0
+            col = openpyxl.utils.cell.get_column_letter(i)
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            width = max_length + 2
+            ws.column_dimensions[col].width = width
+
+        print(ws)
+        wb.save(path)
     print('done')
     reportDone = True
     return new_df
@@ -120,6 +173,4 @@ def summarize(rqst):
         if oper['type'] != 'income':
             sum += oper['amount']
     return sum
-
-
 
