@@ -64,12 +64,12 @@ def createDailyReport(file, nds, report_date=None):
                     name = df.get('ФИО')[index]
                     commentary = df.get('Комментарий')[index]
                     limit = df.get('Лимит')[index]
-                    limit_excess = month_amount - limit
-                    if limit_excess < 0:
-                        limit_excess = 0
                     nds_percentage = (1-nds/100)
                     no_nds_value = amount* nds_percentage
                     no_nds_month_value = month_amount * nds_percentage
+                    limit_excess = no_nds_month_value - limit
+                    if limit_excess < 0:
+                        limit_excess = 0
                     data = [phone, name, commentary, amount, no_nds_value, month_amount, no_nds_month_value, limit_excess]
                     print(data)
                     list.append(data)

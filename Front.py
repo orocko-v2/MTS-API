@@ -141,8 +141,7 @@ class MainWindow(QMainWindow):
             print(self.file, datetime.datetime.now(), reportTime)
             if len(schedule.get_jobs()) != 1:
                 schedule.clear()
-                schedule.every().day.at(reportTime).do(ReportCreator.createDailyReport,
-                                                       (self.file, float(self.ui.plainTextEdit.toPlainText())))
+                schedule.every().day.at(reportTime).do(lambda: ReportCreator.createDailyReport(self.file, float(self.ui.plainTextEdit.toPlainText())))
             elif schedule.get_jobs()[0].next_run.time().strftime('%H:%M') != reportTime:
                 schedule.clear()
                 schedule.every().day.at(reportTime).do(ReportCreator.createDailyReport, self.file)
