@@ -144,7 +144,7 @@ class MainWindow(QMainWindow):
                 schedule.every().day.at(reportTime).do(lambda: ReportCreator.createDailyReport(self.file, float(self.ui.plainTextEdit.toPlainText())))
             elif schedule.get_jobs()[0].next_run.time().strftime('%H:%M') != reportTime:
                 schedule.clear()
-                schedule.every().day.at(reportTime).do(ReportCreator.createDailyReport, self.file)
+                schedule.every().day.at(reportTime).do(lambda: ReportCreator.createDailyReport(self.file, float(self.ui.plainTextEdit.toPlainText())))
             print(schedule.get_jobs())
             schedule.run_pending()
             print(ReportCreator.reportDone)
