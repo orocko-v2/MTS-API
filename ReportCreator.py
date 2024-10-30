@@ -32,6 +32,7 @@ def createDailyReport(file, nds, report_date=None):
     if file is None:
         return
     print(file)
+    print('nds=', nds)
     df = pd.read_excel(file)
     list = []
     print('start creating report')

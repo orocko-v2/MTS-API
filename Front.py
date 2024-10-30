@@ -100,8 +100,12 @@ class MainWindow(QMainWindow):
         self.time = "00:00"
         self.ui = uic.loadUi('data/mainwindow.ui', self)
         self.ui.selectFileButton.clicked.connect(self.buttonClick)
+        if self.ui.plainTextEdit.toPlainText() == '':
+            nds = 0.0
+        else:
+            nds = float(self.ui.plainTextEdit.toPlainText())
         self.ui.createReportButton.clicked.connect(
-            lambda: ReportCreator.createDailyReport(self.file, float(self.ui.plainTextEdit.toPlainText())))
+            lambda: ReportCreator.createDailyReport(self.file, nds))
         self.ui.startThreadButton.clicked.connect(self.threadingStart)
         self.ui.stopThreadButton.clicked.connect(self.stopEvent)
 
@@ -139,12 +143,16 @@ class MainWindow(QMainWindow):
         while state and not stop_event.is_set():
             reportTime = self.ui.timeEdit.time().toString()[0:5]
             print(self.file, datetime.datetime.now(), reportTime)
+            if self.ui.plainTextEdit.toPlainText() == '':
+                nds = 0.0
+            else:
+                nds = float(self.ui.plainTextEdit.toPlainText())
             if len(schedule.get_jobs()) != 1:
                 schedule.clear()
-                schedule.every().day.at(reportTime).do(lambda: ReportCreator.createDailyReport(self.file, float(self.ui.plainTextEdit.toPlainText())))
+                schedule.every().day.at(reportTime).do(lambda: ReportCreator.createDailyReport(self.file, nds))
             elif schedule.get_jobs()[0].next_run.time().strftime('%H:%M') != reportTime:
                 schedule.clear()
-                schedule.every().day.at(reportTime).do(lambda: ReportCreator.createDailyReport(self.file, float(self.ui.plainTextEdit.toPlainText())))
+                schedule.every().day.at(reportTime).do(lambda: ReportCreator.createDailyReport(self.file, nds))
             print(schedule.get_jobs())
             schedule.run_pending()
             print(ReportCreator.reportDone)
